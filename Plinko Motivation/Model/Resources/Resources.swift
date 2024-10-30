@@ -20,6 +20,7 @@ enum Resources {
         static let addTargetButton = "addTargetButton"
         static let infoButton = "infoButton"
         static let settingsButton = "settingsButton"
+        static let launchTheBall = "launchTheBall"
     }
 }
 

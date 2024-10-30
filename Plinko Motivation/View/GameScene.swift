@@ -5,6 +5,8 @@ public class GameScene: SKScene, SKPhysicsContactDelegate {
     
     // MARK: - Properties
     
+    public var ballIsDropped = false
+    
     private var ball: SKShapeNode?
     private let ballRadius: CGFloat = 10
     private let pegRadius: CGFloat = 4
@@ -18,9 +20,11 @@ public class GameScene: SKScene, SKPhysicsContactDelegate {
     private let horizontalLimit: CGFloat = 30.0
    
     private var boxMultipliers: [Int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    private var boxNodes: [SKSpriteNode] = []
+    private var boxLabels: [SKLabelNode] = []
    
     private var isLaunching: Bool = true
-    private var hasBallLanded = false
+    private var hasBallLanded = true
     private var isBonusActive: Bool = false
 
     // MARK: - Initializers
@@ -57,7 +61,6 @@ public class GameScene: SKScene, SKPhysicsContactDelegate {
     
     private func setupNotifications() {
         NotificationCenter.default.addObserver(self, selector: #selector(dropBallAtPosition(_:)), name: NSNotification.Name("dropBallAtPosition"), object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(restartGame(_:)), name: NSNotification.Name("restartGame"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(moveBallToPosition(_:)), name: NSNotification.Name("moveBallToPosition"), object: nil)
        
         NotificationCenter.default.addObserver(self, selector: #selector(isBounusActiveNotification), name: NSNotification.Name("bonusButtonPressed"), object: nil)
@@ -73,9 +76,8 @@ public class GameScene: SKScene, SKPhysicsContactDelegate {
     // MARK: - Game Logic
     
     private func createInitialScene() {
-        createBall(at: CGPoint(x: size.width / 2, y: size.height - 30))
+        createBall(at: CGPoint(x: size.width / 2, y: size.height - 70))
         createInvertedTrianglePegs()
-//        createPyramidPegs()
         createBoxesWithRandomZeroMultiplier()
     }
     
@@ -122,14 +124,18 @@ public class GameScene: SKScene, SKPhysicsContactDelegate {
         imageNode.position = CGPoint(x: position.x + boxWidth / 2, y: position.y + boxHeight / 2)
         imageNode.zPosition = 1 // Размещаем поверх фона
         imageNode.name = "box"
-    
+        
         addChild(imageNode)
+        boxNodes.append(imageNode)
         let label = SKLabelNode(text: "\(multiplier)")
         label.fontColor = .green
+        label.alpha = 1.0
         label.fontSize = 14
-        label.position = CGPoint(x: position.x + boxWidth / 2, y: position.y + boxHeight / 2)
-        label.zPosition = 2
+        label.fontName = "Helvetica-Bold" // Укажите жирный шрифт здесь
+        label.position = CGPoint(x: position.x + boxWidth / 2, y: position.y + boxHeight / 2 - 3)
+        label.zPosition = 9
         addChild(label)
+        boxLabels.append(label)
         
     }
 
@@ -160,7 +166,12 @@ public class GameScene: SKScene, SKPhysicsContactDelegate {
                 let multiplier = boxMultipliers[boxIndex]
                 NotificationCenter.default.post(name: NSNotification.Name("updateMultiplier"), object: multiplier)
                 print("Шарик попал в ячейку с индексом: \(boxIndex) и коэффициентом: \(multiplier)x")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                    self.removeAllBalls()
+                    self.createBall(at: CGPoint(x: self.size.width / 2, y: self.size.height - 70))
                 
+                    
+                }
                 hasBallLanded = true
                 NotificationCenter.default.post(name: NSNotification.Name("ballLanded"), object: nil)
             }
@@ -169,17 +180,18 @@ public class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func checkBallInBoxes(ballPosition: CGPoint) -> Int {
-        let startY: CGFloat = 10
+        let startY: CGFloat = 128
 
         let totalBoxWidth = CGFloat(boxCount) * boxWidth
         let totalSpacing = CGFloat(boxCount - 1) * spacing / 10
         let startX = (size.width - (totalBoxWidth + totalSpacing)) / 2
-        
         for i in 0..<boxCount {
             let boxX = startX + CGFloat(i) * (boxWidth + spacing / 10)
             let boxRect = CGRect(x: boxX, y: startY, width: boxWidth, height: boxHeight)
 
             if boxRect.contains(ballPosition) {
+                boxLabels[i].fontColor = .white
+                boxNodes[i].texture = SKTexture(imageNamed: "boxWhite")
                 return i // Возвращаем индекс ячейки
             }
         }
@@ -189,9 +201,6 @@ public class GameScene: SKScene, SKPhysicsContactDelegate {
     private func smallestMultiplier() -> Int? {
         return boxMultipliers.min()
     }
-    
-    
-
     
     private func createInvertedTrianglePegs() {
         let topY = size.height * 0.8
@@ -255,28 +264,21 @@ public class GameScene: SKScene, SKPhysicsContactDelegate {
     @objc private func dropBallAtPosition(_ notification: Notification) {
         guard let dropPositionX = notification.object as? CGFloat else { return }
         let constrainedXPosition = constrainDropPosition(dropPositionX)
-
+        hasBallLanded = false
         if isBonusActive {
-            ball?.removeFromParent()
             
             for i in 0..<3 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.1) {
-
-                    let ballPosition = CGPoint(x: CGFloat.random(in: 50...200), y: self.size.height - 30)
-                    self.createBall(at: ballPosition)
-                    
                     if let newBall = self.ball {
                         newBall.physicsBody?.isDynamic = true
                     }
                 }
             }
         } else {
-            ball?.position = CGPoint(x: constrainedXPosition, y: size.height - 30)
             ball?.physicsBody?.isDynamic = true
         }
 
         isLaunching = false
-        applyForceTowardsCenter()
     }
     
     private func constrainDropPosition(_ dropPositionX: CGFloat) -> CGFloat {
@@ -290,22 +292,6 @@ public class GameScene: SKScene, SKPhysicsContactDelegate {
         ball?.position.x = newXPosition
     }
     
-    // MARK: - Game Reset
-    var counter = 0
-    @objc private func restartGame(_ notification: Notification) {
-        // Удаляем старый шарик
-        removeAllBalls()
-        counter += 1
-        print(counter)
-        
-        // Создаем новый шарик
-        createBall(at: CGPoint(x: size.width / 2, y: size.height - 30))
-        
-        // Сбрасываем состояние
-        hasBallLanded = false
-        isLaunching = true
-        
-    }
     
     private func removeAllBalls() {
         // Удаляем все шары (если они существуют)
