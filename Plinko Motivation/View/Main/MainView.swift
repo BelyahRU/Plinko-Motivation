@@ -52,6 +52,19 @@ final class MainView: UIView {
         return button
     }()
     
+    public let targetsCollectionView: UICollectionView = {
+       let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .vertical
+        layout.itemSize = CGSize(width: 342, height: 190)
+        layout.minimumLineSpacing = 8
+        layout.minimumInteritemSpacing = 8
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.backgroundColor = .clear
+        collectionView.showsHorizontalScrollIndicator = false
+        collectionView.showsVerticalScrollIndicator = false
+        return collectionView
+    }()
+    
     override init(frame: CGRect) {
         super.init(frame: frame)
         configure()
@@ -70,6 +83,7 @@ final class MainView: UIView {
         addSubview(back)
         addSubview(logoImage)
         addSubview(buttonsStackView)
+        addSubview(targetsCollectionView)
         
         buttonsStackView.addArrangedSubview(addTargetButton)
         buttonsStackView.addArrangedSubview(achievmentsButton)
@@ -105,6 +119,12 @@ final class MainView: UIView {
             $0.snp.makeConstraints { make in
                 make.size.equalTo(52)
             }
+        }
+        
+        targetsCollectionView.snp.makeConstraints { make in
+            make.leading.trailing.equalToSuperview()
+            make.top.equalTo(achievmentsButton.snp.bottom).offset(16)
+            make.bottom.equalToSuperview()
         }
     }
 }
